@@ -98,6 +98,7 @@ class Horse(Base):
     number_of_installments = Column(Integer, nullable=False)
     installment_amount = Column(Float, nullable=False)
     creation_date = Column(DateTime, default=datetime.utcnow)
+    total_percentage = Column(Float, nullable=False)
 
     buyers = relationship("HorseBuyer", back_populates="horse")
     transactions = relationship("Transaction", back_populates="horse")
@@ -311,7 +312,11 @@ def create_horse_with_buyers(
     total_value: float,
     number_of_installments: int,
     buyers_data: List[dict],
+    information: str = None,
+    image: str = None,
 ) -> Horse:
+
+    print("Creating horse with buyers")
     """
     Crea un caballo con sus compradores y cuotas iniciales.
 
@@ -323,10 +328,6 @@ def create_horse_with_buyers(
         ...
     ]
     """
-    # Validar que los porcentajes sumen 100%
-    total_percentage = sum(buyer["percentage"] for buyer in buyers_data)
-    if abs(total_percentage - 100) > 0.01:
-        raise ValueError("Total percentage must be 100%")
 
     # Crear caballo
     horse = Horse(
@@ -334,6 +335,9 @@ def create_horse_with_buyers(
         total_value=total_value,
         number_of_installments=number_of_installments,
         installment_amount=total_value / number_of_installments,
+        total_percentage=sum(buyer["percentage"] for buyer in buyers_data),
+        information=information,
+        image_url=image,
     )
     session.add(horse)
     session.flush()  # Para obtener el ID del caballo

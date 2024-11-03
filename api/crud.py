@@ -21,10 +21,6 @@ def validate_horse_buyers(buyers_data: List[Dict]) -> None:
     if not buyers_data:
         raise ValueError("At least one buyer is required")
 
-    total_percentage = sum(buyer["percentage"] for buyer in buyers_data)
-    if abs(total_percentage - 100) > 0.01:
-        raise ValueError("Total percentage must equal 100%")
-
 
 def delete_horse(db: Session, horse_id: int) -> bool:
     """

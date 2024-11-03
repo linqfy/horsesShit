@@ -54,18 +54,10 @@ class HorseBase(BaseModel):
     image_url: Optional[str] = None
     total_value: float
     number_of_installments: int
-    installment_amount: float
 
 
 class HorseCreate(HorseBase):
     buyers_data: List[dict] = Field(..., example=[{"buyer_id": 1, "percentage": 50.0}])
-
-    @validator("buyers_data")
-    def validate_total_percentage(cls, v):
-        total = sum(buyer["percentage"] for buyer in v)
-        if abs(total - 100) > 0.01:
-            raise ValueError("Total percentage must be 100%")
-        return v
 
 
 class HorseUpdate(BaseModel):
@@ -75,6 +67,7 @@ class HorseUpdate(BaseModel):
     total_value: Optional[float] = None
     number_of_installments: Optional[int] = None
     installment_amount: Optional[float] = None
+    total_porcentage: Optional[float] = None  # owned by buyers
 
 
 class Horse(HorseBase):

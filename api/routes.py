@@ -23,6 +23,8 @@ def create_horse(horse: schemas.HorseCreate, db: Session = Depends(get_db)):
             total_value=horse.total_value,
             number_of_installments=horse.number_of_installments,
             buyers_data=horse.buyers_data,
+            information=horse.information,
+            image_url=horse.image_url,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

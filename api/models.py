@@ -71,6 +71,7 @@ class Horse(Base):
     number_of_installments = Column(Integer, nullable=False)
     installment_amount = Column(Float, nullable=False)
     creation_date = Column(DateTime, default=datetime.utcnow)
+    total_porcentage = Column(Float, default=0.0)
 
     # Relationships
     buyers = relationship("HorseBuyer", back_populates="horse")

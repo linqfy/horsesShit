@@ -5,17 +5,17 @@ from enum import Enum
 
 
 class TransactionType(str, Enum):
-    INGRESO = "ingreso"
-    EGRESO = "egreso"
-    PREMIO = "premio"
-    PAGO = "pago"
+    INGRESO = "INGRESO"
+    EGRESO = "EGRESO"
+    PREMIO = "PREMIO"
+    PAGO = "PAGO"
 
 
 class PaymentStatus(str, Enum):
-    PENDING = "pendiente"
-    PARTIAL = "parcial"
-    PAID = "pagado"
-    OVERDUE = "vencido"
+    PENDING = "PENDIENTE"
+    PARTIAL = "PARCIAL"
+    PAID = "PAGADO"
+    OVERDUE = "VENCIDO"
 
 
 # Base User Models
@@ -23,6 +23,7 @@ class UserBase(BaseModel):
     name: str
     email: EmailStr
     dni: Optional[int] = None
+    is_admin: Optional[bool] = None
 
 
 class UserCreate(UserBase):
@@ -39,6 +40,9 @@ class UserUpdate(BaseModel):
 
 class User(UserBase):
     id: int
+    name: str
+    email: EmailStr
+    dni: Optional[int] = None
     is_admin: bool
     balance: float = 0.0
     created_at: datetime
@@ -85,7 +89,7 @@ class HorseBuyerBase(BaseModel):
 
 
 class HorseBuyerCreate(HorseBuyerBase):
-    buyer_id: int
+    buyer_id: int  # Use the created user's ID
     horse_id: int
 
 
@@ -163,7 +167,7 @@ class TransactionBase(BaseModel):
     concept: str
     total_amount: float
     notes: Optional[str] = None
-    horse_id: Optional[int] = None
+    horse_id: int
 
 
 class TransactionCreate(TransactionBase):
@@ -179,7 +183,7 @@ class TransactionUpdate(BaseModel):
 class Transaction(TransactionBase):
     id: int
     date: datetime
-    created_at: datetime
+    created_at: Optional[datetime]
 
     class Config:
         orm_mode = True

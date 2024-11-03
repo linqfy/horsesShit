@@ -74,17 +74,17 @@ def get_db_context():
 
 
 class TransactionType(enum.Enum):
-    INGRESO = "ingreso"  # Pago de cuotas
-    EGRESO = "egreso"  # Gastos compartidos
-    PREMIO = "premio"  # Premios a repartir
-    PAGO = "pago"  # Pago al admin
+    INGRESO = "INGRESO"  # Income from installment payments
+    EGRESO = "EGRESO"  # Shared expenses
+    PREMIO = "PREMIO"  # Prize money to distribute
+    PAGO = "PAGO"  # Payment to admin
 
 
 class PaymentStatus(enum.Enum):
-    PENDING = "pendiente"
-    PARTIAL = "parcial"
-    PAID = "pagado"
-    OVERDUE = "vencido"
+    PENDING = "PENDIENTE"
+    PARTIAL = "PARCIAL"
+    PAID = "PAGADO"
+    OVERDUE = "VENCIDO"
 
 
 class Horse(Base):
@@ -126,6 +126,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
+    dni = Column(Integer)
     is_admin = Column(Boolean, default=False)
     balance = Column(Float, default=0.0)
 
@@ -313,7 +314,7 @@ def create_horse_with_buyers(
     number_of_installments: int,
     buyers_data: List[dict],
     information: str = None,
-    image: str = None,
+    image_url: str = None,
 ) -> Horse:
 
     print("Creating horse with buyers")
@@ -337,7 +338,7 @@ def create_horse_with_buyers(
         installment_amount=total_value / number_of_installments,
         total_percentage=sum(buyer["percentage"] for buyer in buyers_data),
         information=information,
-        image_url=image,
+        image_url=image_url,
     )
     session.add(horse)
     session.flush()  # Para obtener el ID del caballo

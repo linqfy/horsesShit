@@ -32,10 +32,14 @@ def delete_horse(db: Session, horse_id: int) -> bool:
         return False
 
     try:
-        # Delete related records (cascade should handle this, but being explicit)
-        db.query(BuyerInstallment).join(HorseBuyer).filter(
-            HorseBuyer.horse_id == horse_id
-        ).delete(synchronize_session=False)
+        buyer_installments = db.query(BuyerInstallment).filter(
+            BuyerInstallment.horse_buyer_id.in_(
+                db.query(HorseBuyer.id).filter(HorseBuyer.horse_id == horse_id)
+            )
+        )
+        for installment in buyer_installments:
+            db.delete(installment)
+
         db.query(Installment).filter(Installment.horse_id == horse_id).delete(
             synchronize_session=False
         )
@@ -45,8 +49,6 @@ def delete_horse(db: Session, horse_id: int) -> bool:
         db.query(Transaction).filter(Transaction.horse_id == horse_id).delete(
             synchronize_session=False
         )
-
-        # Delete the horse
         db.delete(horse)
         db.commit()
         return True

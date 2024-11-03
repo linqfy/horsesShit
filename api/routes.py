@@ -1,15 +1,55 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from . import crud, schemas
-from .database import (
-    get_db,
-    create_horse_with_buyers,
-    process_transaction,
-    get_buyer_balance_detail,
-)
+from .database import *
 
 router = APIRouter()
+
+
+# userss
+@router.get("/users/", response_model=List[schemas.User])
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Get all users"""
+    return crud.get_users(db, skip=skip, limit=limit)
+
+
+@router.get("/users/{user_id}", response_model=schemas.User)
+def read_user(user_id: int, db: Session = Depends(get_db)):
+    """Get a user by ID"""
+    db_user = crud.get_user(db, user_id=user_id)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+
+@router.post("/users/", response_model=schemas.User)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    """Create a new user"""
+    return crud.create_user(db=db, user=user)
+
+
+@router.get("/horses/", response_model=List[schemas.Horse])
+def read_horses(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Get all horses"""
+    return crud.get_horses(db, skip=skip, limit=limit)
+
+
+@router.get("/horses/{horse_id}", response_model=schemas.Horse)
+def read_horse(horse_id: int, db: Session = Depends(get_db)):
+    """Get a horse by ID"""
+    db_horse = crud.get_horse(db, horse_id=horse_id)
+    if db_horse is None:
+        raise HTTPException(status_code=404, detail="Horse not found")
+    return db_horse
+
+
+@router.get("/horse-buyers/{horse_id}", response_model=List[schemas.HorseBuyer])
+def read_horse_buyer(horse_id: int, db: Session = Depends(get_db)):
+    db_buyers = crud.get_horse_buyers(db, horse_id=horse_id)
+    if not db_buyers:
+        raise HTTPException(status_code=404, detail="Horse buyers not found")
+    return db_buyers
 
 
 @router.post("/horses/", response_model=schemas.Horse)
@@ -30,6 +70,7 @@ def create_horse(horse: schemas.HorseCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# pq fast api esta chistoso quiere q todo este adentro de un akey llamada horse xd
 @router.put("/horses/{horse_id}", response_model=schemas.Horse)
 def update_horse(
     horse_id: int,

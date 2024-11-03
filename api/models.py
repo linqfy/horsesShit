@@ -20,26 +20,26 @@ Base = declarative_base()
 
 
 class TransactionType(enum.Enum):
-    INGRESO = "ingreso"  # Income from installment payments
-    EGRESO = "egreso"  # Shared expenses
-    PREMIO = "premio"  # Prize money to distribute
-    PAGO = "pago"  # Payment to admin
+    INGRESO = "INGRESO"  # Income from installment payments
+    EGRESO = "EGRESO"  # Shared expenses
+    PREMIO = "PREMIO"  # Prize money to distribute
+    PAGO = "PAGO"  # Payment to admin
 
 
 class PaymentStatus(enum.Enum):
-    PENDING = "pendiente"
-    PARTIAL = "parcial"
-    PAID = "pagado"
-    OVERDUE = "vencido"
+    PENDING = "PENDIENTE"
+    PARTIAL = "PARCIAL"
+    PAID = "PAGADO"
+    OVERDUE = "VENCIDO"
 
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
-    dni = Column(Integer)
     name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
+    dni = Column(Integer)
     is_admin = Column(Boolean, default=False)
     balance = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)

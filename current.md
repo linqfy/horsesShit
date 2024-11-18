@@ -1,28 +1,56 @@
-# Horse Management System API Documentation
+# Horse Management API Documentation
 
-## Overview
+## Table of Contents
 
-This API manages a horse ownership system where multiple users can buy shares of horses and manage payments through installments. It handles user management, horse registration, buyer management, transactions, and payment processing.
+* [1. Users](#1-users)
+  * [1.1. List All Users](#11-list-all-users)
+  * [1.2. Get User by ID](#12-get-user-by-id)
+  * [1.3. Create User](#13-create-user)
+  * [1.4. Update User](#14-update-user)
+  * [1.5. Delete User](#15-delete-user)
+* [2. Horses](#2-horses)
+  * [2.1. List All Horses](#21-list-all-horses)
+  * [2.2. Get Horse by ID](#22-get-horse-by-id)
+  * [2.3. Create Horse with Buyers](#23-create-horse-with-buyers)
+  * [2.4. Update Horse](#24-update-horse)
+  * [2.5. Delete Horse](#25-delete-horse)
+* [3. Horse Buyers](#3-horse-buyers)
+  * [3.1. Get Horse Buyers](#31-get-horse-buyers)
+  * [3.2. Update Horse Buyer](#32-update-horse-buyer)
+  * [3.3. Delete Horse Buyer](#33-delete-horse-buyer)
+* [4. Transactions](#4-transactions)
+  * [4.1. Create Transaction](#41-create-transaction)
+  * [4.2. Update Transaction](#42-update-transaction)
+  * [4.3. Delete Transaction](#43-delete-transaction)
+* [5. Payments](#5-payments)
+  * [5.1. Create Payment](#51-create-payment)
+  * [5.2. Update Payment](#52-update-payment)
+  * [5.3. Delete Payment](#53-delete-payment)
 
-## Base URL
+## 1. Users
 
+### 1.1. List All Users
+
+Retrieves all registered users.
+
+```bash
+curl -X GET "http://localhost:8000/users/" \
+     -H "accept: application/json"
 ```
-http://your-domain.com/api/v1
+
+### 1.2. Get User by ID
+
+Retrieves a specific user by their ID.
+
+**Parameters:**
+* `user_id` (integer, path)
+
+```bash
+curl -X GET "http://localhost:8000/users/1" \
+     -H "accept: application/json"
 ```
 
-## Authentication
-
-[Note: Authentication implementation pending. All endpoints will require proper authentication in production.]
-
-## Endpoints
-
-### Users
-
-#### Create User
-
-```http
-POST /users/
-```
+### 1.3. Create User
 
 Creates a new user in the system.
 
@@ -30,276 +58,383 @@ Creates a new user in the system.
 
 ```json
 {
-    "name": "John Doe",
-    "email": "john@example.com"
+  "name": "Juan Pérez",
+  "email": "juan.perez@example.com",
+  "dni": "12345678A",
+  "is_admin": true
 }
 ```
 
-**Response:** `201 Created`
+```bash
+curl -X POST "http://localhost:8000/users/" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "name": "Juan Pérez",
+           "email": "juan.perez@example.com",
+           "dni": "12345678A",
+           "is_admin": true
+         }'
+```
+
+### 1.4. Update User
+
+Updates an existing user's information.
+
+**Parameters:**
+* `user_id` (integer, path)
+
+**Request Body:** (only fields to update)
 
 ```json
 {
-    "id": 1,
-    "name": "John Doe",
-    "email": "john@example.com",
-    "is_admin": false,
-    "balance": 0.0
+  "name": "Juan P. Pérez",
+  "balance": 1500.50
 }
 ```
 
-#### Get User
-
-```http
-GET /users/{user_id}
+```bash
+curl -X PUT "http://localhost:8000/users/1" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "name": "Juan P. Pérez",
+           "balance": 1500.50
+         }'
 ```
 
-Retrieves user information by ID.
+### 1.5. Delete User
 
-**Response:** `200 OK`
+Removes a user from the system.
 
-```json
-{
-    "id": 1,
-    "name": "John Doe",
-    "email": "john@example.com",
-    "is_admin": false,
-    "balance": 1000.0
-}
+**Parameters:**
+* `user_id` (integer, path)
+
+```bash
+curl -X DELETE "http://localhost:8000/users/1" \
+     -H "accept: application/json"
 ```
 
-#### Get User Balance
+## 2. Horses
 
-```http
-GET /users/{user_id}/balance
+### 2.1. List All Horses
+
+Retrieves all registered horses.
+
+```bash
+curl -X GET "http://localhost:8000/horses/" \
+     -H "accept: application/json"
 ```
 
-Retrieves detailed balance information for a user.
+### 2.2. Get Horse by ID
 
-**Response:** `200 OK`
+Retrieves a specific horse by its ID.
 
-```json
-{
-    "current_balance": 1000.0,
-    "pending_installments": 5000.0,
-    "total_paid": 3000.0
-}
+**Parameters:**
+* `horse_id` (integer, path)
+
+```bash
+curl -X GET "http://localhost:8000/horses/1" \
+     -H "accept: application/json"
 ```
 
-### Horses
+### 2.3. Create Horse with Buyers
 
-#### Create Horse
-
-```http
-POST /horses/
-```
-
-Creates a new horse with its buyers.
+Creates a new horse entry with associated buyers.
 
 **Request Body:**
 
 ```json
 {
-    "name": "Thunder",
-    "information": "5 year old stallion",
-    "image_url": "https://example.com/thunder.jpg",
-    "total_value": 50000.0,
-    "number_of_installments": 12,
-    "installment_amount": 4166.67,
-    "buyers_data": [
-        {
-            "buyer_id": 1,
-            "percentage": 60.0
-        },
-        {
-            "buyer_id": 2,
-            "percentage": 40.0
-        }
-    ]
+  "name": "Spirit",
+  "information": "Fast and enduring horse",
+  "image_url": "http://example.com/spirit.jpg",
+  "total_value": 10000.0,
+  "number_of_installments": 10,
+  "buyers_data": [
+    {
+      "buyer_id": 1,
+      "percentage": 50.0
+    },
+    {
+      "buyer_id": 2,
+      "percentage": 50.0
+    }
+  ]
 }
 ```
 
-**Response:** `201 Created`
+```bash
+curl -X POST "http://localhost:8000/horses/" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "name": "Spirit",
+           "information": "Fast and enduring horse",
+           "image_url": "http://example.com/spirit.jpg",
+           "total_value": 10000.0,
+           "number_of_installments": 10,
+           "buyers_data": [
+             {
+               "buyer_id": 1,
+               "percentage": 50.0
+             },
+             {
+               "buyer_id": 2,
+               "percentage": 50.0
+             }
+           ]
+         }'
+```
+
+### 2.4. Update Horse
+
+Updates horse information and optionally its buyers.
+
+**Parameters:**
+* `horse_id` (integer, path)
+
+**Request Body:** (only fields to update)
 
 ```json
 {
-    "id": 1,
-    "name": "Thunder",
-    "information": "5 year old stallion",
-    "image_url": "https://example.com/thunder.jpg",
-    "total_value": 50000.0,
-    "number_of_installments": 12,
-    "installment_amount": 4166.67,
-    "creation_date": "2024-11-02T10:00:00Z"
+  "information": "Updated horse information",
+  "buyers_data": [
+    {
+      "buyer_id": 1,
+      "percentage": 60.0
+    },
+    {
+      "buyer_id": 3,
+      "percentage": 40.0
+    }
+  ]
 }
 ```
 
-#### Get Horse
-
-```http
-GET /horses/{horse_id}
+```bash
+curl -X PUT "http://localhost:8000/horses/1" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "information": "Updated horse information",
+           "buyers_data": [
+             {
+               "buyer_id": 1,
+               "percentage": 60.0
+             },
+             {
+               "buyer_id": 3,
+               "percentage": 40.0
+             }
+           ]
+         }'
 ```
 
-Retrieves horse information by ID.
+### 2.5. Delete Horse
 
-#### Get Horse Buyers
+Removes a horse and all related records from the system.
 
-```http
-GET /horses/{horse_id}/buyers
+**Parameters:**
+* `horse_id` (integer, path)
+
+```bash
+curl -X DELETE "http://localhost:8000/horses/1" \
+     -H "accept: application/json"
 ```
 
-Retrieves all buyers for a specific horse.
+## 3. Horse Buyers
 
-### Transactions
+### 3.1. Get Horse Buyers
 
-#### Create Transaction
+Retrieves all buyers associated with a specific horse.
 
-```http
-POST /transactions/
+**Parameters:**
+* `horse_id` (integer, path)
+
+```bash
+curl -X GET "http://localhost:8000/horse-buyers/1" \
+     -H "accept: application/json"
 ```
 
-Creates a new transaction (income, expense, or prize).
+### 3.2. Update Horse Buyer
+
+Updates a horse buyer's information.
+
+**Parameters:**
+* `buyer_id` (integer, path)
+
+**Request Body:** (only fields to update)
+
+```json
+{
+  "percentage": 55.0,
+  "active": false
+}
+```
+
+```bash
+curl -X PUT "http://localhost:8000/horse-buyers/1" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "percentage": 55.0,
+           "active": false
+         }'
+```
+
+### 3.3. Delete Horse Buyer
+
+Removes a horse buyer and redistributes their percentage among other buyers.
+
+**Parameters:**
+* `buyer_id` (integer, path)
+
+```bash
+curl -X DELETE "http://localhost:8000/horse-buyers/1" \
+     -H "accept: application/json"
+```
+
+## 4. Transactions
+
+### 4.1. Create Transaction
+
+Creates a new transaction.
 
 **Request Body:**
 
 ```json
 {
-    "type": "ingreso",
-    "concept": "Monthly payment",
-    "total_amount": 4166.67,
-    "notes": "November payment",
-    "horse_id": 1
+  "type": "INGRESO",
+  "concept": "Payment for installment 1",
+  "total_amount": 500.0,
+  "notes": "Payment made on 10/10/2023",
+  "horse_id": 1
 }
 ```
 
-**Response:** `201 Created`
+```bash
+curl -X POST "http://localhost:8000/transactions/" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "type": "INGRESO",
+           "concept": "Payment for installment 1",
+           "total_amount": 500.0,
+           "notes": "Payment made on 10/10/2023",
+           "horse_id": 1
+         }'
+```
+
+> **Note:** Valid transaction types are: `INGRESO`, `EGRESO`, `PREMIO`, `PAGO`
+
+### 4.2. Update Transaction
+
+Updates an existing transaction.
+
+**Parameters:**
+* `transaction_id` (integer, path)
+
+**Request Body:** (only fields to update)
 
 ```json
 {
-    "id": 1,
-    "type": "ingreso",
-    "concept": "Monthly payment",
-    "total_amount": 4166.67,
-    "notes": "November payment",
-    "horse_id": 1,
-    "date": "2024-11-02T10:00:00Z"
+  "concept": "Updated transaction concept",
+  "total_amount": 600.0
 }
 ```
 
-#### List Transactions
-
-```http
-GET /transactions/
+```bash
+curl -X PUT "http://localhost:8000/transactions/1" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "concept": "Updated transaction concept",
+           "total_amount": 600.0
+         }'
 ```
 
-Retrieves transactions with optional filters.
+### 4.3. Delete Transaction
 
-**Query Parameters:**
+Removes a transaction from the system.
 
-- `horse_id` (optional): Filter by horse
-- `transaction_type` (optional): Filter by type (ingreso, egreso, premio, pago)
-- `skip` (optional): Pagination offset
-- `limit` (optional): Pagination limit
+**Parameters:**
+* `transaction_id` (integer, path)
 
-### Payments
-
-#### Create Payment
-
-```http
-POST /payments/
+```bash
+curl -X DELETE "http://localhost:8000/transactions/1" \
+     -H "accept: application/json"
 ```
 
-Records a payment for an installment.
+## 5. Payments
+
+### 5.1. Create Payment
+
+Creates a new payment for a specific installment.
 
 **Request Body:**
 
 ```json
 {
-    "buyer_installment_id": 1,
-    "amount": 2500.0
+  "buyer_installment_id": 1,
+  "amount": 100.0
 }
 ```
 
-#### List Payments
-
-```http
-GET /payments/
+```bash
+curl -X POST "http://localhost:8000/payments/" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "buyer_installment_id": 1,
+           "amount": 100.0
+         }'
 ```
 
-Retrieves payments with optional filters.
+### 5.2. Update Payment
 
-**Query Parameters:**
+Updates an existing payment.
 
-- `buyer_id` (optional): Filter by buyer
-- `horse_id` (optional): Filter by horse
-- `skip` (optional): Pagination offset
-- `limit` (optional): Pagination limit
+**Parameters:**
+* `payment_id` (integer, path)
 
-## Enums
-
-### TransactionType
-
-- `ingreso`: Income (installment payments)
-- `egreso`: Expense (shared costs)
-- `premio`: Prize (to be distributed)
-- `pago`: Payment (to admin)
-
-### PaymentStatus
-
-- `pendiente`: Pending payment
-- `parcial`: Partially paid
-- `pagado`: Fully paid
-- `vencido`: Overdue
-
-## Error Responses
-
-### 400 Bad Request
-
-Returned when the request is invalid.
+**Request Body:** (only fields to update)
 
 ```json
 {
-    "detail": "Error message explaining the issue"
+  "amount": 150.0
 }
 ```
 
-### 404 Not Found
-
-Returned when the requested resource doesn't exist.
-
-```json
-{
-    "detail": "Resource not found"
-}
+```bash
+curl -X PUT "http://localhost:8000/payments/1" \
+     -H "Content-Type: application/json" \
+     -d '{
+           "amount": 150.0
+         }'
 ```
 
-### 500 Internal Server Error
+### 5.3. Delete Payment
 
-Returned when an unexpected error occurs.
+Removes a payment from the system.
 
-```json
-{
-    "detail": "Internal server error"
-}
+**Parameters:**
+* `payment_id` (integer, path)
+
+```bash
+curl -X DELETE "http://localhost:8000/payments/1" \
+     -H "accept: application/json"
 ```
 
-## Notes
+## Additional Information
 
-1. All monetary values are in the system's default currency unit
-2. Dates are returned in ISO 8601 format
-3. Pagination is available on list endpoints using `skip` and `limit` parameters
-4. Total percentages for horse buyers must equal exactly 100%
-5. Transaction processing is atomic and will rollback on failure
-6. Installment amounts are calculated automatically based on total value and number of installments
+### Base URL
 
-## Best Practices
+Replace `http://localhost:8000` with your actual API base URL.
 
-1. Always validate response status codes
-2. Implement proper error handling
-3. Use pagination for large data sets
-4. Keep track of transaction IDs for troubleshooting
-5. Regularly check user balances
-6. Monitor payment status for overdue installments
+### Headers
 
-## Rate Limiting
+- Use `Content-Type: application/json` for POST/PUT requests
+* Use `accept: application/json` to receive JSON responses
 
-[Note: Rate limiting implementation pending. Production API will include rate limits.]
+### Error Handling
+
+- The API returns appropriate HTTP status codes
+* Error responses include a JSON body with error details
+
+### Data Validation
+
+- Total buyer percentages must equal 100%
+* Payment amounts must be positive and not exceed pending amounts

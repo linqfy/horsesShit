@@ -1,9 +1,12 @@
-from pydantic import BaseModel, Field, validator, EmailStr
-from typing import List, Optional, Dict, Any
+# backend/prod/api/schemas.py
+
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, root_validator
+from typing import List, Optional, Dict
 from datetime import datetime
 from enum import Enum
 
 
+# Enumeraciones compartidas
 class TransactionType(str, Enum):
     INGRESO = "INGRESO"
     EGRESO = "EGRESO"
@@ -18,41 +21,37 @@ class PaymentStatus(str, Enum):
     OVERDUE = "VENCIDO"
 
 
-# Base User Models
-class UserBase(BaseModel):
+# User Schemas
+class UserBaseSchema(BaseModel):
     name: str
     email: EmailStr
-    dni: Optional[int] = None
+    dni: Optional[str] = None
     is_admin: Optional[bool] = None
 
 
-class UserCreate(UserBase):
+class UserCreateSchema(UserBaseSchema):
     pass
 
 
-class UserUpdate(BaseModel):
+class UserUpdateSchema(BaseModel):
     name: Optional[str] = None
     email: Optional[EmailStr] = None
-    dni: Optional[int] = None
+    dni: Optional[str] = None
     is_admin: Optional[bool] = None
     balance: Optional[float] = None
 
 
-class User(UserBase):
+class UserSchema(UserBaseSchema):
     id: int
-    name: str
-    email: EmailStr
-    dni: Optional[int] = None
-    is_admin: bool
-    balance: float = 0.0
+    balance: float
     created_at: datetime
+    updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# Base Horse Models
-class HorseBase(BaseModel):
+# Horse Schemas
+class HorseBaseSchema(BaseModel):
     name: str
     information: Optional[str] = None
     image_url: Optional[str] = None
@@ -60,81 +59,84 @@ class HorseBase(BaseModel):
     number_of_installments: int
 
 
-class HorseCreate(HorseBase):
+class HorseSchema(HorseBaseSchema):
+    id: int
+    creation_date: datetime
+    total_percentage: float
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HorseCreateSchema(HorseBaseSchema):
     buyers_data: List[dict] = Field(..., example=[{"buyer_id": 1, "percentage": 50.0}])
 
 
-class HorseUpdate(BaseModel):
+class HorseUpdateSchema(BaseModel):
     name: Optional[str] = None
     information: Optional[str] = None
     image_url: Optional[str] = None
     total_value: Optional[float] = None
     number_of_installments: Optional[int] = None
-    installment_amount: Optional[float] = None
-    total_porcentage: Optional[float] = None  # owned by buyers
+    total_percentage: Optional[float] = None  # Corregido el nombre
+    buyers_data: Optional[List[dict]] = None  # Agregado
 
 
-class Horse(HorseBase):
-    id: int
-    creation_date: datetime
-
-    class Config:
-        orm_mode = True
-
-
-# Horse Buyer Models
-class HorseBuyerBase(BaseModel):
+# Horse Buyer Schemas
+class HorseBuyerBaseSchema(BaseModel):
     percentage: float
     active: bool = True
 
 
-class HorseBuyerCreate(HorseBuyerBase):
+class HorseBuyerCreateSchema(HorseBuyerBaseSchema):
     buyer_id: int  # Use the created user's ID
     horse_id: int
 
 
-class HorseBuyerUpdate(BaseModel):
+class HorseBuyerUpdateSchema(BaseModel):
     percentage: Optional[float] = None
     active: Optional[bool] = None
 
 
-class HorseBuyer(HorseBuyerBase):
+class HorseBuyerSchema(HorseBuyerBaseSchema):
     id: int
     horse_id: int
     buyer_id: int
     join_date: datetime
+    updated_at: datetime
+    balance: float
+    installments: List["BuyerInstallmentSchema"] = []  # Forward reference
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# Installment Models
-class InstallmentBase(BaseModel):
+# Installment Schemas
+class InstallmentBaseSchema(BaseModel):
     horse_id: int
     due_date: datetime
     amount: float
     installment_number: int
 
 
-class InstallmentCreate(InstallmentBase):
+class InstallmentCreateSchema(InstallmentBaseSchema):
     pass
 
 
-class InstallmentUpdate(BaseModel):
+class InstallmentUpdateSchema(BaseModel):
     due_date: Optional[datetime] = None
     amount: Optional[float] = None
 
 
-class Installment(InstallmentBase):
+class InstallmentSchema(InstallmentBaseSchema):
     id: int
     created_at: datetime
+    updated_at: datetime
+    buyer_installments: List["BuyerInstallmentSchema"] = []  # Forward reference
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# Buyer Installment Models
-class BuyerInstallmentBase(BaseModel):
+# Buyer Installment Schemas
+class BuyerInstallmentBaseSchema(BaseModel):
     horse_buyer_id: int
     installment_id: int
     amount: float
@@ -142,74 +144,149 @@ class BuyerInstallmentBase(BaseModel):
     status: PaymentStatus = PaymentStatus.PENDING
 
 
-class BuyerInstallmentCreate(BuyerInstallmentBase):
+class BuyerInstallmentCreateSchema(BuyerInstallmentBaseSchema):
     pass
 
 
-class BuyerInstallmentUpdate(BaseModel):
+class BuyerInstallmentUpdateSchema(BaseModel):
     amount: Optional[float] = None
     amount_paid: Optional[float] = None
     status: Optional[PaymentStatus] = None
 
 
-class BuyerInstallment(BuyerInstallmentBase):
+class BuyerInstallmentSchema(BuyerInstallmentBaseSchema):
     id: int
     last_payment_date: Optional[datetime]
     created_at: datetime
+    updated_at: datetime
+    payments: List["InstallmentPaymentSchema"] = []  # Forward reference
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# Transaction Models
-class TransactionBase(BaseModel):
+# Transaction Schemas
+class TransactionBaseSchema(BaseModel):
     type: TransactionType
     concept: str
     total_amount: float
     notes: Optional[str] = None
-    horse_id: int
+    horse_id: Optional[int] = None
+    user_id: Optional[int] = None  # Nuevo campo
 
 
-class TransactionCreate(TransactionBase):
-    pass
+class TransactionCreateSchema(TransactionBaseSchema):
+    @root_validator(pre=True)
+    def check_fields_based_on_type(cls, values):
+        transaction_type = values.get("type")
+        horse_id = values.get("horse_id")
+        user_id = values.get("user_id")
+
+        if transaction_type in ["EGRESO", "PREMIO"]:
+            if not horse_id and user_id is None:
+                raise ValueError(
+                    f"El campo 'horse_id' es requerido para el tipo de transacción '{transaction_type}'"
+                )
+        elif transaction_type in ["INGRESO", "PAGO"]:
+            if not user_id:
+                raise ValueError(
+                    f"El campo 'user_id' es requerido para el tipo de transacción '{transaction_type}'"
+                )
+        return values
 
 
-class TransactionUpdate(BaseModel):
+class TransactionUpdateSchema(BaseModel):
+    type: Optional[TransactionType] = None
     concept: Optional[str] = None
     total_amount: Optional[float] = None
     notes: Optional[str] = None
+    horse_id: Optional[int] = None
+    user_id: Optional[int] = None
+
+    @root_validator(pre=True)
+    def check_fields_based_on_type(cls, values):
+        transaction_type = values.get("type")
+        horse_id = values.get("horse_id")
+        user_id = values.get("user_id")
+
+        if transaction_type:
+            if transaction_type in ["INGRESO", "EGRESO", "PREMIO"]:
+                if "horse_id" not in values or not horse_id:
+                    raise ValueError(
+                        f"El campo 'horse_id' es requerido para el tipo de transacción '{transaction_type}'"
+                    )
+            elif transaction_type == "PAGO":
+                if "user_id" not in values or not user_id:
+                    raise ValueError(
+                        "El campo 'user_id' es requerido para el tipo de transacción 'PAGO'"
+                    )
+        return values
 
 
-class Transaction(TransactionBase):
+class TransactionSchema(TransactionBaseSchema):
     id: int
     date: datetime
-    created_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+    installment_payments: List["InstallmentPaymentSchema"] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-# Payment Models
-class InstallmentPaymentBase(BaseModel):
+# Installment Payment Schemas
+class InstallmentPaymentBaseSchema(BaseModel):
     buyer_installment_id: int
+    buyer_id: int
+    transaction_id: int
     amount: float
 
 
-class InstallmentPaymentCreate(InstallmentPaymentBase):
+class InstallmentPaymentCreateSchema(InstallmentPaymentBaseSchema):
     pass
 
 
-class InstallmentPaymentUpdate(BaseModel):
+class InstallmentPaymentUpdateSchema(BaseModel):
     amount: Optional[float] = None
 
 
-class InstallmentPayment(InstallmentPaymentBase):
+class InstallmentPaymentSchema(InstallmentPaymentBaseSchema):
     id: int
-    transaction_id: int
-    buyer_id: int
     payment_date: datetime
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Horse Detail Schema
+class HorseDetailSchema(BaseModel):
+    id: int
+    name: str
+    information: Optional[str] = None
+    image_url: Optional[str] = None
+    total_value: float
+    number_of_installments: int
+    creation_date: datetime
+    total_percentage: float
+    buyers: List[HorseBuyerSchema] = []
+    transactions: List[TransactionSchema] = []
+    installments: List[InstallmentSchema] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Schema para Detalle de Balance de Usuario
+class BuyerBalanceDetailSchema(BaseModel):
+    current_balance: float
+    pending_installments: float
+    total_paid: float
+    horse_balances: List[Dict[str, float]]  # Detalle por HorseBuyer
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Actualizar referencias para forward references
+HorseBuyerSchema.update_forward_refs()
+BuyerInstallmentSchema.update_forward_refs()
+InstallmentPaymentSchema.update_forward_refs()
+TransactionSchema.update_forward_refs()
+InstallmentSchema.update_forward_refs()

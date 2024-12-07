@@ -364,3 +364,43 @@ def get_user_balance_detail(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=500, detail="Error al obtener el balance del usuario"
         )
+
+
+@router.get(
+    "/horse-buyers/{horse_buyer_id}/installments",
+    response_model=List[schemas.BuyerInstallmentSchema],
+)
+def get_installments(
+    horse_buyer_id: int,
+    month: int = None,
+    year: int = None,
+    db: Session = Depends(get_db),
+):
+    from datetime import datetime
+
+    # Use current month and year as default if not provided
+    if month is None or year is None:
+        current_date = datetime.utcnow()
+        month = month or current_date.month
+        year = year or current_date.year
+
+    installments = (
+        db.query(BuyerInstallment)
+        .join(Installment)
+        .filter(BuyerInstallment.horse_buyer_id == horse_buyer_id)
+        .filter(Installment.mes == month, Installment.año == year)
+        .all()  # Retrieve all matching installments
+    )
+    return installments
+
+
+# Get installment by ID
+@router.get(
+    "/installments/{installment_id}",
+    response_model=schemas.InstallmentSchema,
+)
+def get_installment(installment_id: int, db: Session = Depends(get_db)):
+    db_installment = crud.get_installment(db, installment_id=installment_id)
+    if not db_installment:
+        raise HTTPException(status_code=404, detail="Installment not found")
+    return db_installment

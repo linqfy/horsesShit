@@ -144,6 +144,7 @@ class Horse(Base):
     __tablename__ = "horses"
 
     id = Column(Integer, primary_key=True)
+    starting_billing_month = Column(Integer, nullable=False)
     name = Column(String(100), nullable=False)
     information = Column(Text)
     image_url = Column(String(500))
@@ -227,6 +228,8 @@ class Installment(Base):
     installment_number = Column(Integer, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    mes = Column(Integer, nullable=False)
+    año = Column(Integer, nullable=False)
 
     # Relaciones
     horse = relationship("Horse", back_populates="installments")
@@ -333,6 +336,8 @@ class Transaction(Base):
     )
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    mes = Column(Integer, nullable=False)
+    año = Column(Integer, nullable=False)
 
     # Relaciones
     horse = relationship("Horse", back_populates="transactions")

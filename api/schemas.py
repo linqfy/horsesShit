@@ -57,10 +57,12 @@ class HorseBaseSchema(BaseModel):
     image_url: Optional[str] = None
     total_value: float
     number_of_installments: int
+    starting_billing_month: int
 
 
 class HorseSchema(HorseBaseSchema):
     id: int
+    starting_billing_month: int
     creation_date: datetime
     total_percentage: float
 
@@ -77,6 +79,7 @@ class HorseUpdateSchema(BaseModel):
     image_url: Optional[str] = None
     total_value: Optional[float] = None
     number_of_installments: Optional[int] = None
+    starting_billing_month: Optional[int] = None
     total_percentage: Optional[float] = None  # Corregido el nombre
     buyers_data: Optional[List[dict]] = None  # Agregado
 
@@ -115,6 +118,8 @@ class InstallmentBaseSchema(BaseModel):
     due_date: datetime
     amount: float
     installment_number: int
+    mes: int
+    año: int
 
 
 class InstallmentCreateSchema(InstallmentBaseSchema):
@@ -130,6 +135,8 @@ class InstallmentSchema(InstallmentBaseSchema):
     id: int
     created_at: datetime
     updated_at: datetime
+    mes: int
+    año: int
     buyer_installments: List["BuyerInstallmentSchema"] = []  # Forward reference
 
     model_config = ConfigDict(from_attributes=True)
@@ -167,22 +174,27 @@ class BuyerInstallmentSchema(BuyerInstallmentBaseSchema):
 # Transaction Schemas
 class TransactionBaseSchema(BaseModel):
     type: TransactionType
-    concept: str
+    concept: Optional[str] = None
     total_amount: float
     notes: Optional[str] = None
     horse_id: Optional[int] = None
-    user_id: Optional[int] = None  # Nuevo campo
+    user_id: Optional[int] = None
+    mes: int
+    año: int
 
 
 class TransactionCreateSchema(TransactionBaseSchema):
+    mes: int
+    año: int
+
     @root_validator(pre=True)
     def check_fields_based_on_type(cls, values):
         transaction_type = values.get("type")
         horse_id = values.get("horse_id")
         user_id = values.get("user_id")
-
+        concept = values.get("concept")
         if transaction_type in ["EGRESO", "PREMIO"]:
-            if not horse_id and user_id is None:
+            if not horse_id:
                 raise ValueError(
                     f"El campo 'horse_id' es requerido para el tipo de transacción '{transaction_type}'"
                 )
@@ -191,6 +203,10 @@ class TransactionCreateSchema(TransactionBaseSchema):
                 raise ValueError(
                     f"El campo 'user_id' es requerido para el tipo de transacción '{transaction_type}'"
                 )
+        if transaction_type != "PREMIO" and not concept:
+            raise ValueError(
+                "El campo 'concept' es obligatorio excepto para transacciones de tipo 'PREMIO'"
+            )
         return values
 
 
@@ -201,6 +217,9 @@ class TransactionUpdateSchema(BaseModel):
     notes: Optional[str] = None
     horse_id: Optional[int] = None
     user_id: Optional[int] = None
+
+    mes: Optional[int] = None
+    año: Optional[int] = None
 
     @root_validator(pre=True)
     def check_fields_based_on_type(cls, values):
@@ -228,6 +247,8 @@ class TransactionSchema(TransactionBaseSchema):
     created_at: datetime
     updated_at: datetime
     installment_payments: List["InstallmentPaymentSchema"] = []
+    mes: int
+    año: int
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -238,6 +259,8 @@ class InstallmentPaymentBaseSchema(BaseModel):
     buyer_id: int
     transaction_id: int
     amount: float
+    mes: int
+    año: int
 
 
 class InstallmentPaymentCreateSchema(InstallmentPaymentBaseSchema):
@@ -265,6 +288,7 @@ class HorseDetailSchema(BaseModel):
     image_url: Optional[str] = None
     total_value: float
     number_of_installments: int
+    starting_billing_month: int
     creation_date: datetime
     total_percentage: float
     buyers: List[HorseBuyerSchema] = []

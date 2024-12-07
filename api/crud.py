@@ -18,12 +18,18 @@ logger = logging.getLogger(__name__)
 # ----------------------
 
 
-def calculate_due_date(base_date: datetime, installment_number: int) -> datetime:
+def calculate_due_date(
+    base_date: datetime, installment_number: int, start_month: int
+) -> datetime:
     """
     Calcula la fecha de vencimiento de una cuota.
-    Ejemplo: cuota mensual, por lo que se añade 30 días por cuota.
+    Ajusta el mes basado en la cuota y el mes inicial de facturación.
     """
-    return base_date + timedelta(days=30 * installment_number)
+    year_offset, month_offset = divmod(start_month - 1 + installment_number, 12)
+    new_month = (month_offset % 12) + 1
+    return base_date.replace(
+        year=base_date.year + year_offset, month=new_month, day=base_date.day
+    )
 
 
 def update_installment_status(buyer_installment: BuyerInstallment):
@@ -42,8 +48,16 @@ def _create_installments_for_horse(horse: Horse, db: Session) -> None:
     """
     try:
         for i in range(1, horse.number_of_installments + 1):
-            # Calcular la fecha de vencimiento
-            due_date = calculate_due_date(horse.creation_date, i)
+            due_month = (horse.starting_billing_month + i - 1) % 12 + 1
+            due_year = (
+                datetime.now().year + (horse.starting_billing_month + i - 1) // 12
+            )
+            due_date = datetime(due_year, due_month, 1)
+
+            # Calcular la fecha de vencimiento usando el mes inicial de facturación
+            due_date = calculate_due_date(
+                horse.creation_date, i, horse.starting_billing_month
+            )
 
             # Crear la cuota
             installment = Installment(
@@ -51,6 +65,8 @@ def _create_installments_for_horse(horse: Horse, db: Session) -> None:
                 due_date=due_date,
                 amount=horse.total_value / horse.number_of_installments,
                 installment_number=i,
+                mes=due_month,
+                año=due_year,
             )
             db.add(installment)
             db.flush()  # Asegura que installment.id esté disponible
@@ -69,79 +85,20 @@ def _create_installments_for_horse(horse: Horse, db: Session) -> None:
                 )
                 db.add(buyer_installment)
         # No se realiza commit aquí
-        logger.info(f"Installments created for Horse ID {horse.id}")
+        logger.debug(f"Installments created for Horse ID {horse.id}")
     except SQLAlchemyError as e:
         logger.error(f"Error al crear cuotas: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al crear cuotas: {str(e)}")
 
 
-def _create_horse_with_buyers(
-    session: Session,
-    name: str,
-    total_value: float,
-    number_of_installments: int,
-    buyers_data: List[dict],
-    information: str = None,
-    image_url: str = None,
-) -> Horse:
-    """
-    Crea un caballo con sus compradores y cuotas iniciales.
-    """
-    logger.info("Creando caballo con compradores")
-
-    # Validar porcentajes
-    total_percentage = sum(buyer["percentage"] for buyer in buyers_data)
-    if abs(total_percentage - 100) > 0.01:
-        logger.error("La suma de los porcentajes no es 100%")
-        raise ValueError("La suma de los porcentajes debe ser 100%")
-
-    try:
-        with session.begin():  # Maneja la transacción completa
-            # Crear caballo
-            horse = Horse(
-                name=name,
-                total_value=total_value,
-                number_of_installments=number_of_installments,
-                total_percentage=total_percentage,
-                information=information,
-                image_url=image_url,
-            )
-            session.add(horse)
-            session.flush()
-
-            # Crear compradores
-            for buyer_data in buyers_data:
-                horse_buyer = HorseBuyer(
-                    horse=horse,
-                    buyer_id=buyer_data["buyer_id"],
-                    percentage=buyer_data["percentage"],
-                )
-                session.add(horse_buyer)
-
-            # Crear cuotas
-            _create_installments_for_horse(horse, session)
-
-        session.refresh(horse)
-        logger.info(f"Horse creado con ID {horse.id}")
-        return horse
-    except SQLAlchemyError as e:
-        logger.error(f"Error creando caballo con compradores: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail="Error al crear el caballo con compradores"
-        )
-    except ValueError as ve:
-        logger.error(f"Validación fallida al crear caballo: {str(ve)}")
-        raise HTTPException(status_code=400, detail=str(ve))
-
-
 def distribute_prize(transaction: Transaction, session: Session):
     """Distribuye un premio entre los compradores según su porcentaje."""
     horse = transaction.horse
-    logger.info(f"Distributing prize for horse {horse.id} among buyers.")
+    logger.debug(f"Distributing prize for horse {horse.id} among buyers.")
     for horse_buyer in horse.buyers:
         buyer_amount = transaction.total_amount * (horse_buyer.percentage / 100)
         horse_buyer.buyer.balance += buyer_amount
-        logger.info(
+        logger.debug(
             f"Updated balance for buyer {horse_buyer.buyer_id}: {horse_buyer.balance}"
         )
     session.commit()
@@ -155,11 +112,11 @@ def distribute_prize(transaction: Transaction, session: Session):
 def distribute_expense(transaction: Transaction, session: Session):
     """Distribuye un gasto entre los compradores según su porcentaje."""
     horse = transaction.horse
-    logger.info(f"Distributing expense for horse {horse.id} among buyers.")
+    logger.debug(f"Distributing expense for horse {horse.id} among buyers.")
     for horse_buyer in horse.buyers:
         expense_amount = transaction.total_amount * (horse_buyer.percentage / 100)
-        horse_buyer.balance -= expense_amount
-        logger.info(
+        horse_buyer.buyer.balance -= expense_amount
+        logger.debug(
             f"Deducted {expense_amount} from buyer {horse_buyer.buyer_id}, new balance: {horse_buyer.balance}"
         )
     session.commit()
@@ -171,21 +128,18 @@ def distribute_expense(transaction: Transaction, session: Session):
 
 
 def distribute_income_payment(transaction: Transaction, session: Session):
-    """Distribuye un ingreso directamente al balance del usuario."""
-    horse = transaction.horse
-    logger.info(f"Distributing income for horse {horse.id} among buyers.")
-    for horse_buyer in horse.buyers:
-        if horse_buyer.buyer_id == transaction.user_id:
-            horse_buyer.buyer.balance += transaction.total_amount
-            logger.info(
-                f"Updated user balance for buyer {horse_buyer.buyer_id}: {horse_buyer.buyer.balance}"
-            )
+    """Ingresa el monto directamente al balance del usuario."""
+    user_tt = transaction.user
+    user_tt.balance += transaction.total_amount
+    logger.debug(
+        f"Updated user balance for user {user_tt.id}: {user_tt.balance}, total: {transaction.total_amount}"
+    )
     session.commit()
 
 
 def process_income(transaction: Transaction, session: Session):
     """Procesa una transacción de tipo INGRESO o PREMIO."""
-    logger.info(f"Processing income transaction: {transaction.id}")
+    logger.debug(f"Processing income transaction: {transaction.id}")
     if transaction.type == TransactionType.INGRESO:
         distribute_income_payment(transaction, session)
     elif transaction.type == TransactionType.PREMIO:
@@ -204,26 +158,6 @@ def get_pending_buyer_installments(horse: Horse, session: Session):
         )
         .all()
     )
-
-
-def create_horse_with_buyers(db: Session, **horse_data) -> Horse:
-    """
-    Crea un caballo con sus compradores y cuotas iniciales.
-    """
-    try:
-        return _create_horse_with_buyers(
-            session=db,
-            name=horse_data.get("name"),
-            total_value=horse_data.get("total_value"),
-            number_of_installments=horse_data.get("number_of_installments"),
-            buyers_data=horse_data.get("buyers_data"),
-            information=horse_data.get("information"),
-            image_url=horse_data.get("image_url"),
-        )
-    except HTTPException as e:
-        raise e
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
 
 
 def process_transaction(transaction: Transaction, session: Session):
@@ -275,7 +209,7 @@ def recalculate_installments(db: Session, horse: Horse) -> None:
                 )
                 db.add(buyer_installment)
         db.commit()
-        logger.info(f"Cuotas recalculadas para Horse ID {horse.id}")
+        logger.debug(f"Cuotas recalculadas para Horse ID {horse.id}")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error al recalcular cuotas: {str(e)}")
@@ -336,7 +270,7 @@ def create_user(db: Session, user: schemas.UserCreateSchema) -> User:
     try:
         db.commit()
         db.refresh(db_user)
-        logger.info(f"Usuario creado con ID {db_user.id}")
+        logger.debug(f"Usuario creado con ID {db_user.id}")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error al crear el usuario: {str(e)}")
@@ -355,7 +289,7 @@ def update_user(db: Session, user: User, user_update: schemas.UserUpdateSchema) 
     try:
         db.commit()
         db.refresh(user)
-        logger.info(f"Usuario actualizado con ID {user.id}")
+        logger.debug(f"Usuario actualizado con ID {user.id}")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error al actualizar el usuario: {str(e)}")
@@ -375,7 +309,7 @@ def delete_user(db: Session, user_id: int) -> bool:
     db.delete(user)
     try:
         db.commit()
-        logger.info(f"Usuario eliminado con ID {user_id}")
+        logger.debug(f"Usuario eliminado con ID {user_id}")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error al eliminar el usuario: {str(e)}")
@@ -432,7 +366,7 @@ def create_horse_buyer(
     try:
         db.commit()
         db.refresh(db_horse_buyer)
-        logger.info(f"HorseBuyer creado con ID {db_horse_buyer.id}")
+        logger.debug(f"HorseBuyer creado con ID {db_horse_buyer.id}")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error al crear HorseBuyer: {str(e)}")
@@ -455,7 +389,7 @@ def update_horse_buyer(
     try:
         db.commit()
         db.refresh(horse_buyer)
-        logger.info(f"HorseBuyer actualizado con ID {horse_buyer.id}")
+        logger.debug(f"HorseBuyer actualizado con ID {horse_buyer.id}")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error al actualizar HorseBuyer: {str(e)}")
@@ -484,7 +418,7 @@ def delete_horse_buyer(db: Session, horse_buyer_id: int) -> bool:
 
         db.delete(horse_buyer)
         db.commit()
-        logger.info(f"HorseBuyer eliminado con ID {horse_buyer_id}")
+        logger.debug(f"HorseBuyer eliminado con ID {horse_buyer_id}")
         return True
     except SQLAlchemyError as e:
         db.rollback()
@@ -513,27 +447,6 @@ def get_transaction(db: Session, transaction_id: int) -> Optional[Transaction]:
     return db.query(Transaction).filter(Transaction.id == transaction_id).first()
 
 
-def create_transaction(
-    db: Session, transaction: schemas.TransactionCreateSchema
-) -> Transaction:
-    """
-    Crear una nueva transacción.
-    """
-    db_transaction = Transaction(**transaction.dict())
-    db.add(db_transaction)
-    try:
-        db.commit()
-        db.refresh(db_transaction)
-        logger.info(f"Transacción creada con ID {db_transaction.id}")
-        return db_transaction
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error al crear la transacción: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error al crear la transacción: {str(e)}"
-        )
-
-
 def update_transaction(
     db: Session,
     transaction: Transaction,
@@ -547,7 +460,7 @@ def update_transaction(
     try:
         db.commit()
         db.refresh(transaction)
-        logger.info(f"Transacción actualizada con ID {transaction.id}")
+        logger.debug(f"Transacción actualizada con ID {transaction.id}")
         return transaction
     except SQLAlchemyError as e:
         db.rollback()
@@ -567,7 +480,7 @@ def delete_transaction(db: Session, transaction_id: int) -> bool:
     try:
         db.delete(transaction)
         db.commit()
-        logger.info(f"Transacción eliminada con ID {transaction_id}")
+        logger.debug(f"Transacción eliminada con ID {transaction_id}")
         return True
     except SQLAlchemyError as e:
         db.rollback()
@@ -589,12 +502,12 @@ def process_payment(buyer_installment: BuyerInstallment, session: Session):
     buyer_installment.amount_paid += remaining_amount
     update_installment_status(buyer_installment)
     session.commit()
-    logger.info(f"Installment ID {buyer_installment.id} marked as PAID")
+    logger.debug(f"Installment ID {buyer_installment.id} marked as PAID")
 
     # Actualizar balance del comprador
     horse_buyer = buyer_installment.horse_buyer
     horse_buyer.balance -= remaining_amount
-    logger.info(
+    logger.debug(
         f"Deducted {remaining_amount} from buyer {horse_buyer.buyer_id}, new balance: {horse_buyer.balance}"
     )
     # Actualizar balance total del usuario
@@ -683,6 +596,7 @@ def get_horse(db: Session, horse_id: int) -> Optional[Horse]:
 
 
 def _create_horse_with_buyers(
+    starting_billing_month: int,
     session: Session,
     name: str,
     total_value: float,
@@ -694,7 +608,7 @@ def _create_horse_with_buyers(
     """
     Crea un caballo con sus compradores y cuotas iniciales.
     """
-    logger.info("Creando caballo con compradores")
+    logger.debug("Creando caballo con compradores")
 
     # Validar porcentajes
     total_percentage = sum(buyer["percentage"] for buyer in buyers_data)
@@ -706,6 +620,7 @@ def _create_horse_with_buyers(
         with session.begin():  # Maneja la transacción completa
             # Crear caballo
             horse = Horse(
+                starting_billing_month=starting_billing_month,
                 name=name,
                 total_value=total_value,
                 number_of_installments=number_of_installments,
@@ -729,7 +644,7 @@ def _create_horse_with_buyers(
             _create_installments_for_horse(horse, session)
 
         session.refresh(horse)
-        logger.info(f"Horse creado con ID {horse.id}")
+        logger.debug(f"Horse creado con ID {horse.id}")
         return horse
     except SQLAlchemyError as e:
         logger.error(f"Error creando caballo con compradores: {str(e)}")
@@ -754,6 +669,7 @@ def create_horse_with_buyers(db: Session, **horse_data) -> Horse:
             buyers_data=horse_data.get("buyers_data"),
             information=horse_data.get("information"),
             image_url=horse_data.get("image_url"),
+            starting_billing_month=horse_data.get("starting_billing_month"),
         )
     except HTTPException as e:
         raise e
@@ -769,7 +685,7 @@ def update_horse(
     """
     try:
         with db.begin():  # Maneja la transacción completa
-            # Actualizar información básica del caballo
+            # Actualizar debugrmación básica del caballo
             for key, value in horse_update.dict(exclude_unset=True).items():
                 if key != "buyers_data":
                     setattr(horse, key, value)
@@ -807,7 +723,7 @@ def update_horse(
                 recalculate_installments(db, horse)
 
         db.refresh(horse)
-        logger.info(f"Caballo actualizado con ID {horse.id}")
+        logger.debug(f"Caballo actualizado con ID {horse.id}")
         return horse
     except SQLAlchemyError as e:
         logger.error(f"Error al actualizar el caballo: {str(e)}")
@@ -859,7 +775,7 @@ def delete_horse(db: Session, horse_id: int) -> bool:
             # Eliminar el caballo
             db.delete(horse)
 
-        logger.info(f"Caballo eliminado con ID {horse_id}")
+        logger.debug(f"Caballo eliminado con ID {horse_id}")
         return True
     except SQLAlchemyError as e:
         logger.error(f"Error al eliminar el caballo: {str(e)}")
@@ -915,7 +831,7 @@ def create_horse_buyer(
     try:
         db.commit()
         db.refresh(db_horse_buyer)
-        logger.info(f"HorseBuyer creado con ID {db_horse_buyer.id}")
+        logger.debug(f"HorseBuyer creado con ID {db_horse_buyer.id}")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error al crear HorseBuyer: {str(e)}")
@@ -938,7 +854,7 @@ def update_horse_buyer(
     try:
         db.commit()
         db.refresh(horse_buyer)
-        logger.info(f"HorseBuyer actualizado con ID {horse_buyer.id}")
+        logger.debug(f"HorseBuyer actualizado con ID {horse_buyer.id}")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error al actualizar HorseBuyer: {str(e)}")
@@ -967,7 +883,7 @@ def delete_horse_buyer(db: Session, horse_buyer_id: int) -> bool:
                 db.delete(installment)
 
             db.delete(horse_buyer)
-        logger.info(f"HorseBuyer eliminado con ID {horse_buyer_id}")
+        logger.debug(f"HorseBuyer eliminado con ID {horse_buyer_id}")
         return True
     except SQLAlchemyError as e:
         logger.error(f"Error al eliminar HorseBuyer: {str(e)}")
@@ -995,27 +911,6 @@ def get_transaction(db: Session, transaction_id: int) -> Optional[Transaction]:
     return db.query(Transaction).filter(Transaction.id == transaction_id).first()
 
 
-def create_transaction(
-    db: Session, transaction: schemas.TransactionCreateSchema
-) -> Transaction:
-    """
-    Crear una nueva transacción.
-    """
-    db_transaction = Transaction(**transaction.dict())
-    db.add(db_transaction)
-    try:
-        db.commit()
-        db.refresh(db_transaction)
-        logger.info(f"Transacción creada con ID {db_transaction.id}")
-        return db_transaction
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error al crear la transacción: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error al crear la transacción: {str(e)}"
-        )
-
-
 def update_transaction(
     db: Session,
     transaction: Transaction,
@@ -1029,7 +924,7 @@ def update_transaction(
     try:
         db.commit()
         db.refresh(transaction)
-        logger.info(f"Transacción actualizada con ID {transaction.id}")
+        logger.debug(f"Transacción actualizada con ID {transaction.id}")
         return transaction
     except SQLAlchemyError as e:
         db.rollback()
@@ -1049,7 +944,7 @@ def delete_transaction(db: Session, transaction_id: int) -> bool:
     try:
         with db.begin():  # Maneja la transacción completa
             db.delete(transaction)
-        logger.info(f"Transacción eliminada con ID {transaction_id}")
+        logger.debug(f"Transacción eliminada con ID {transaction_id}")
         return True
     except SQLAlchemyError as e:
         logger.error(f"Error al eliminar la transacción: {str(e)}")
@@ -1070,12 +965,12 @@ def process_payment(buyer_installment: BuyerInstallment, session: Session):
     buyer_installment.amount_paid += remaining_amount
     update_installment_status(buyer_installment)
     session.commit()
-    logger.info(f"Installment ID {buyer_installment.id} marked as PAID")
+    logger.debug(f"Installment ID {buyer_installment.id} marked as PAID")
 
     # Actualizar balance del comprador
     horse_buyer = buyer_installment.horse_buyer
     horse_buyer.balance -= remaining_amount
-    logger.info(
+    logger.debug(
         f"Deducted {remaining_amount} from buyer {horse_buyer.buyer_id}, new balance: {horse_buyer.balance}"
     )
     # Actualizar balance total del usuario
@@ -1188,7 +1083,7 @@ def update_transaction(
     try:
         db.commit()
         db.refresh(transaction)
-        logger.info(f"Transacción actualizada con ID {transaction.id}")
+        logger.debug(f"Transacción actualizada con ID {transaction.id}")
         return transaction
     except SQLAlchemyError as e:
         db.rollback()
@@ -1208,7 +1103,7 @@ def delete_transaction(db: Session, transaction_id: int) -> bool:
     try:
         with db.begin():  # Maneja la transacción completa
             db.delete(transaction)
-        logger.info(f"Transacción eliminada con ID {transaction_id}")
+        logger.debug(f"Transacción eliminada con ID {transaction_id}")
         return True
     except SQLAlchemyError as e:
         logger.error(f"Error al eliminar la transacción: {str(e)}")
@@ -1264,7 +1159,7 @@ def create_horse_buyer(
     try:
         db.commit()
         db.refresh(db_horse_buyer)
-        logger.info(f"HorseBuyer creado con ID {db_horse_buyer.id}")
+        logger.debug(f"HorseBuyer creado con ID {db_horse_buyer.id}")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error al crear HorseBuyer: {str(e)}")
@@ -1287,7 +1182,7 @@ def update_horse_buyer(
     try:
         db.commit()
         db.refresh(horse_buyer)
-        logger.info(f"HorseBuyer actualizado con ID {horse_buyer.id}")
+        logger.debug(f"HorseBuyer actualizado con ID {horse_buyer.id}")
         return horse_buyer
     except SQLAlchemyError as e:
         db.rollback()
@@ -1317,7 +1212,7 @@ def delete_horse_buyer(db: Session, horse_buyer_id: int) -> bool:
                 db.delete(installment)
 
             db.delete(horse_buyer)
-        logger.info(f"HorseBuyer eliminado con ID {horse_buyer_id}")
+        logger.debug(f"HorseBuyer eliminado con ID {horse_buyer_id}")
         return True
     except SQLAlchemyError as e:
         logger.error(f"Error al eliminar HorseBuyer: {str(e)}")
@@ -1343,12 +1238,12 @@ def process_payment(buyer_installment: BuyerInstallment, session: Session):
     buyer_installment.amount_paid += remaining_amount
     update_installment_status(buyer_installment)
     session.commit()
-    logger.info(f"Installment ID {buyer_installment.id} marked as PAID")
+    logger.debug(f"Installment ID {buyer_installment.id} marked as PAID")
 
     # Actualizar balance del comprador
     horse_buyer = buyer_installment.horse_buyer
     horse_buyer.balance -= remaining_amount
-    logger.info(
+    logger.debug(
         f"Deducted {remaining_amount} from buyer {horse_buyer.buyer_id}, new balance: {horse_buyer.balance}"
     )
     # Actualizar balance total del usuario
@@ -1436,85 +1331,6 @@ def get_horse(db: Session, horse_id: int) -> Optional[Horse]:
     )
 
 
-def _create_horse_with_buyers(
-    session: Session,
-    name: str,
-    total_value: float,
-    number_of_installments: int,
-    buyers_data: List[dict],
-    information: str = None,
-    image_url: str = None,
-) -> Horse:
-    """
-    Crea un caballo con sus compradores y cuotas iniciales.
-    """
-    logger.info("Creando caballo con compradores")
-
-    # Validar porcentajes
-    total_percentage = sum(buyer["percentage"] for buyer in buyers_data)
-    if abs(total_percentage - 100) > 0.01:
-        logger.error("La suma de los porcentajes no es 100%")
-        raise ValueError("La suma de los porcentajes debe ser 100%")
-
-    try:
-        with session.begin():  # Maneja la transacción completa
-            # Crear caballo
-            horse = Horse(
-                name=name,
-                total_value=total_value,
-                number_of_installments=number_of_installments,
-                total_percentage=total_percentage,
-                information=information,
-                image_url=image_url,
-            )
-            session.add(horse)
-            session.flush()
-
-            # Crear compradores
-            for buyer_data in buyers_data:
-                horse_buyer = HorseBuyer(
-                    horse=horse,
-                    buyer_id=buyer_data["buyer_id"],
-                    percentage=buyer_data["percentage"],
-                )
-                session.add(horse_buyer)
-
-            # Crear cuotas
-            _create_installments_for_horse(horse, session)
-
-        session.refresh(horse)
-        logger.info(f"Horse creado con ID {horse.id}")
-        return horse
-    except SQLAlchemyError as e:
-        logger.error(f"Error creando caballo con compradores: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail="Error al crear el caballo con compradores"
-        )
-    except ValueError as ve:
-        logger.error(f"Validación fallida al crear caballo: {str(ve)}")
-        raise HTTPException(status_code=400, detail=str(ve))
-
-
-def create_horse_with_buyers(db: Session, **horse_data) -> Horse:
-    """
-    Crea un caballo con sus compradores y cuotas iniciales.
-    """
-    try:
-        return _create_horse_with_buyers(
-            session=db,
-            name=horse_data.get("name"),
-            total_value=horse_data.get("total_value"),
-            number_of_installments=horse_data.get("number_of_installments"),
-            buyers_data=horse_data.get("buyers_data"),
-            information=horse_data.get("information"),
-            image_url=horse_data.get("image_url"),
-        )
-    except HTTPException as e:
-        raise e
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-
-
 def update_horse(
     db: Session, horse: Horse, horse_update: schemas.HorseUpdateSchema
 ) -> Horse:
@@ -1523,7 +1339,7 @@ def update_horse(
     """
     try:
         with db.begin():  # Maneja la transacción completa
-            # Actualizar información básica del caballo
+            # Actualizar debugrmación básica del caballo
             for key, value in horse_update.dict(exclude_unset=True).items():
                 if key != "buyers_data":
                     setattr(horse, key, value)
@@ -1561,7 +1377,7 @@ def update_horse(
                 recalculate_installments(db, horse)
 
         db.refresh(horse)
-        logger.info(f"Caballo actualizado con ID {horse.id}")
+        logger.debug(f"Caballo actualizado con ID {horse.id}")
         return horse
     except SQLAlchemyError as e:
         logger.error(f"Error al actualizar el caballo: {str(e)}")
@@ -1613,10 +1429,18 @@ def delete_horse(db: Session, horse_id: int) -> bool:
             # Eliminar el caballo
             db.delete(horse)
 
-        logger.info(f"Caballo eliminado con ID {horse_id}")
+        logger.debug(f"Caballo eliminado con ID {horse_id}")
         return True
     except SQLAlchemyError as e:
         logger.error(f"Error al eliminar el caballo: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Error al eliminar el caballo: {str(e)}"
         )
+
+
+# get installment by id
+def get_installment(db: Session, installment_id: int) -> Optional[Installment]:
+    """
+    Obtener una cuota por su ID.
+    """
+    return db.query(Installment).filter(Installment.id == installment_id).first()

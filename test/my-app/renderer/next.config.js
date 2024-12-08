@@ -2,19 +2,11 @@
 
 const withTM = require('next-transpile-modules')([
   'antd',
-  'rc-util',
-  'rc-virtual-list',
-  'rc-menu',
-  'rc-dropdown',
-  'rc-pagination',
-  'rc-select',
-  'rc-tree',
-  'rc-picker',
-  'rc-tooltip',
-  'rc-table',
-  'rc-input',
   '@ant-design/icons',
-  '@ant-design/icons-svg'
+  'axios',
+  'jspdf',
+  'jspdf-autotable', 
+  'moment'
 ]);
 
 
@@ -25,6 +17,7 @@ module.exports = withTM({
   images: {
     unoptimized: true,
   },
+  reactStrictMode: false,  // Disable React Strict Mode
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.target = 'electron-renderer';

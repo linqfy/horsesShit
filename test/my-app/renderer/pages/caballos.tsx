@@ -1,3 +1,4 @@
+'use client'
 import { ThunderboltOutlined } from '@ant-design/icons';
 import { Button, Card, Input, Spin, message } from 'antd';
 import axios from 'axios';

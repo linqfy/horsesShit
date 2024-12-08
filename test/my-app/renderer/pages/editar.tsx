@@ -1,5 +1,5 @@
+'use client'
 // pages/editar/index.tsx
-
 import { TeamOutlined, TransactionOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Checkbox, Collapse, Form, Input, List, Modal, Spin, message } from 'antd';
 import axios from 'axios';

@@ -1,3 +1,4 @@
+'use client'
 // pages/crear/caballo.tsx
 
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
@@ -200,8 +201,6 @@ const CrearCaballo: React.FC = () => {
                                         <InputNumber
                                             min={1}
                                             max={100}
-                                            formatter={(value) => `${value}%`}
-                                            parser={(value) => value!.replace('%', '')}
                                             placeholder="Porcentaje"
                                         />
                                     </Form.Item>

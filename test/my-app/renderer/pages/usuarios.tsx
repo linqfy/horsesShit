@@ -1,3 +1,4 @@
+'use client'
 import { SearchOutlined, UserOutlined } from '@ant-design/icons';
 import { Button, Card, Input, Select } from 'antd';
 import axios from 'axios';

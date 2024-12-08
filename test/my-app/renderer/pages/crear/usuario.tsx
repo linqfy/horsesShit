@@ -1,3 +1,4 @@
+'use client'
 // pages/crear/usuario.tsx
 
 import { Button, Checkbox, Form, Input, message } from 'antd';

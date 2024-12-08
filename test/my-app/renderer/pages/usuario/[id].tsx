@@ -1,3 +1,4 @@
+'use client'
 // pages/detalleUsuario.tsx
 
 import {

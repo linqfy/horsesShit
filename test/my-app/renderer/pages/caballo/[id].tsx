@@ -315,7 +315,7 @@ const DetalleCaballo: React.FC = () => {
                                     <p>Porcentaje: {comprador.percentage}%</p>
                                     <Button
                                         type="link"
-                                        onClick={() => router.push(`/detalle-usuario/${comprador.buyer_id}`)}
+                                        onClick={() => router.push(`/usuario/${comprador.buyer_id}`)}
                                     >
                                         Ver Detalles del Usuario
                                     </Button>

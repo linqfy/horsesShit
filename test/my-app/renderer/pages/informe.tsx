@@ -206,7 +206,7 @@ const InformePage: React.FC = () => {
 
                 // Transactions Information
                 const buyerTransactions = transactions.filter(
-                    (t) => t.mes === month && t.año === year
+                    (t) => t.mes === month && t.año === year && (t.user_id === buyer.buyer_id || t.horse_id === selectedHorseId)
                 );
 
                 if (buyerTransactions.length > 0) {
@@ -259,10 +259,13 @@ const InformePage: React.FC = () => {
                 // Buyer's balance
                 const buyerBalance = buyer.balance;
 
-                // Display Total
-                doc.text(`Total: $${total.toFixed(2)}`, 14, yPosition);
-                yPosition += 6;
                 doc.text(`Balance del Comprador: $${buyerBalance.toFixed(2)}`, 14, yPosition);
+                yPosition += 6;
+
+                total += buyerBalance;
+                // Display Total
+                doc.text(`Total: $${Number(total.toFixed(2)) * -1}`, 14, yPosition);
+
 
                 // Save or Download PDF
                 doc.save(`Informe_${buyer.buyer_name || 'Usuario'}_${horseData.name}_${month}_${year}.pdf`);

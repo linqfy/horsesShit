@@ -147,7 +147,7 @@ const CrearCaballo: React.FC = () => {
                     <InputNumber min={1} style={{ width: '100%' }} />
                 </Form.Item>
                 <Form.Item
-                    label="Mes de Facturación Inicial"
+                    label="Mes de Facturación Inicial (la primera cuota se facturará en el siguiente mes)"
                     name="starting_billing_month"
                     rules={[
                         { required: true, message: 'Por favor seleccione el mes de facturación inicial' },

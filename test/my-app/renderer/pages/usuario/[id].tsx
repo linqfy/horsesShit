@@ -349,7 +349,7 @@ const DetalleUsuario: React.FC = () => {
             });
 
             // Fetch horse names for transactions that involve a horse
-            const horseIds = userTransactions
+            const horseIds = allTransactions
                 .filter((t) => t.horse_id)
                 .map((t) => t.horse_id) as number[];
 
@@ -619,7 +619,7 @@ const DetalleUsuario: React.FC = () => {
                                             transactionsSortedInfo.order,
                                     },
                                     {
-                                        title: 'Monto',
+                                        title: 'Monto total',
                                         dataIndex: 'total_amount',
                                         key: 'total_amount',
                                         render: (amount: number) => `$${amount.toLocaleString()}`,

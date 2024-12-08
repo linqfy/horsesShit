@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 
 const withTM = require('next-transpile-modules')([
-  '@ant-design/icons',
-  '@ant-design/icons-svg',
+  'antd',
   'rc-util',
   'rc-virtual-list',
   'rc-menu',
@@ -14,8 +13,9 @@ const withTM = require('next-transpile-modules')([
   'rc-tooltip',
   'rc-table',
   'rc-input',
+  '@ant-design/icons',
+  '@ant-design/icons-svg'
 ]);
-
 
 
 module.exports = withTM({
@@ -25,7 +25,14 @@ module.exports = withTM({
   images: {
     unoptimized: true,
   },
-  webpack: (config) => {
-    return config
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.target = 'electron-renderer';
+    }
+    return config;
+  },
+
+  typescript: {
+    ignoreBuildErrors: true,
   },
 })

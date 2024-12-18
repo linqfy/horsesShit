@@ -10,6 +10,7 @@ import {
     Spin,
 } from 'antd';
 import axios from 'axios';
+import dayjs, { Dayjs } from 'dayjs';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import moment from 'moment';
@@ -86,7 +87,7 @@ const InformePage: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(false);
     const [horses, setHorses] = useState<Horse[]>([]);
     const [selectedHorseId, setSelectedHorseId] = useState<number | null>(null);
-    const [selectedMonthYear, setSelectedMonthYear] = useState<moment.Moment | null>(null);
+    const [selectedMonthYear, setSelectedMonthYear] = useState<Dayjs | null>(null);
     const [horseData, setHorseData] = useState<Horse | null>(null);
 
     useEffect(() => {

@@ -1,12 +1,22 @@
 import type { AppProps } from 'next/app';
+import dynamic from 'next/dynamic';
+import NoSSR from 'react-no-ssr';
+import { AppProvider } from '../context/provider';
 import '../styles/globals.css';
-import AppLayout from './home';
+
+const AppLayout = dynamic(() => import('../components/layout'), { ssr: false });
+
+const Loading = () => (<div>Loading...</div>);
 
 function MyApp({ Component, pageProps }: AppProps) {
     return (
-        <AppLayout>
-            <Component {...pageProps} />
-        </AppLayout>
+        <AppProvider>
+            <NoSSR onSSR={<Loading />}>
+                <AppLayout>
+                    <Component {...pageProps} />
+                </AppLayout>
+            </NoSSR>
+        </AppProvider >
     );
 }
 

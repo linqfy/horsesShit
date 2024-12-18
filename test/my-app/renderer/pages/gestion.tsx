@@ -8,15 +8,14 @@ import {
     Select,
     Table,
 } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import type { FilterValue, SorterResult } from 'antd/lib/table/interface';
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import React, { useEffect, useState } from 'react';
-
-import type { ColumnsType } from 'antd/es/table';
-import type { FilterValue, SorterResult } from 'antd/lib/table/interface';
 
 const { Option } = Select;
 
@@ -203,18 +202,25 @@ const GestionPage: React.FC = () => {
                 const aValue = a[columnKey as keyof Transaction];
                 const bValue = b[columnKey as keyof Transaction];
 
+                // Numeric comparison
                 if (typeof aValue === 'number' && typeof bValue === 'number') {
                     return order === 'ascend' ? aValue - bValue : bValue - aValue;
                 }
 
-                if (aValue instanceof Date && bValue instanceof Date) {
-                    return order === 'ascend'
-                        ? aValue.getTime() - bValue.getTime()
-                        : bValue.getTime() - aValue.getTime();
+                // Date comparison (assuming aValue and bValue are strings representing dates)
+                if (typeof aValue === 'string' && typeof bValue === 'string') {
+                    const aDate = new Date(aValue);
+                    const bDate = new Date(bValue);
+                    if (!isNaN(aDate.getTime()) && !isNaN(bDate.getTime())) {
+                        return order === 'ascend'
+                            ? aDate.getTime() - bDate.getTime()
+                            : bDate.getTime() - aDate.getTime();
+                    }
                 }
 
-                const aStr = String(aValue || '');
-                const bStr = String(bValue || '');
+                // String comparison
+                const aStr = String(aValue ?? '');
+                const bStr = String(bValue ?? '');
                 return order === 'ascend'
                     ? aStr.localeCompare(bStr)
                     : bStr.localeCompare(aStr);
@@ -443,7 +449,11 @@ const GestionPage: React.FC = () => {
             dataIndex: 'concept',
             key: 'concept',
             sorter: (a, b) => (a.concept || '').localeCompare(b.concept || ''),
-            sortOrder: sortedInfo.columnKey === 'concept' && sortedInfo.order,
+            sortOrder: sortedInfo.columnKey === 'concept' &&
+                (sortedInfo.order === 'ascend' || sortedInfo.order === 'descend')
+                ? sortedInfo.order
+                : undefined,
+
         },
         {
             title: 'Monto',
@@ -451,7 +461,11 @@ const GestionPage: React.FC = () => {
             key: 'total_amount',
             render: (amount: number) => `$${amount.toLocaleString()}`,
             sorter: (a, b) => a.total_amount - b.total_amount,
-            sortOrder: sortedInfo.columnKey === 'total_amount' && sortedInfo.order,
+            sortOrder: sortedInfo.columnKey === 'total_amount' &&
+                (sortedInfo.order === 'ascend' || sortedInfo.order === 'descend')
+                ? sortedInfo.order
+                : undefined,
+
         },
         {
             title: 'Usuario',
@@ -470,9 +484,11 @@ const GestionPage: React.FC = () => {
                 ),
             sorter: (a, b) =>
                 (a.user_name || '').localeCompare(b.user_name || ''),
-            sortOrder:
-                sortedInfo.columnKey === 'user_name' &&
-                sortedInfo.order,
+            sortOrder: sortedInfo.columnKey === 'user_name' &&
+                (sortedInfo.order === 'ascend' || sortedInfo.order === 'descend')
+                ? sortedInfo.order
+                : undefined,
+
         },
         {
             title: 'Caballo',
@@ -481,9 +497,11 @@ const GestionPage: React.FC = () => {
             render: (text: string) => text || '-',
             sorter: (a, b) =>
                 (a.horse_name || '').localeCompare(b.horse_name || ''),
-            sortOrder:
-                sortedInfo.columnKey === 'horse_name' &&
-                sortedInfo.order,
+            sortOrder: sortedInfo.columnKey === 'horse_name' &&
+                (sortedInfo.order === 'ascend' || sortedInfo.order === 'descend')
+                ? sortedInfo.order
+                : undefined,
+
         },
         {
             title: 'Fecha',
@@ -492,7 +510,11 @@ const GestionPage: React.FC = () => {
             render: (date: string) => new Date(date).toLocaleDateString(),
             sorter: (a, b) =>
                 new Date(a.date).getTime() - new Date(b.date).getTime(),
-            sortOrder: sortedInfo.columnKey === 'date' && sortedInfo.order,
+            sortOrder: sortedInfo.columnKey === 'date' &&
+                (sortedInfo.order === 'ascend' || sortedInfo.order === 'descend')
+                ? sortedInfo.order
+                : undefined,
+
         },
     ];
 

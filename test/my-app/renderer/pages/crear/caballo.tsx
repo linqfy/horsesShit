@@ -201,7 +201,7 @@ const CrearCaballo: React.FC = () => {
                                             min={1}
                                             max={100}
                                             formatter={(value) => `${value}%`}
-                                            parser={(value) => value!.replace('%', '')}
+                                            parser={(value) => Number(value?.replace('%', '')) as 1 | 100}
                                             placeholder="Porcentaje"
                                         />
                                     </Form.Item>

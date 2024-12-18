@@ -1,22 +1,10 @@
-/** @type {import('next').NextConfig} */
-
+// next.config.js
 const withTM = require('next-transpile-modules')([
   'antd',
-  'rc-util',
-  'rc-virtual-list',
-  'rc-menu',
-  'rc-dropdown',
-  'rc-pagination',
-  'rc-select',
-  'rc-tree',
-  'rc-picker',
-  'rc-tooltip',
-  'rc-table',
-  'rc-input',
   '@ant-design/icons',
-  '@ant-design/icons-svg'
 ]);
-
+const path = require('path');
+const webpack = require('webpack');
 
 module.exports = withTM({
   output: 'export',
@@ -26,13 +14,38 @@ module.exports = withTM({
     unoptimized: true,
   },
   webpack: (config, { isServer }) => {
+    config.resolve = {
+      ...config.resolve,
+      extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
+      modules: [
+        'node_modules',
+        path.resolve(__dirname, '../node_modules'),
+        path.resolve(__dirname, 'node_modules'),
+      ],
+      fallback: {
+        ...config.resolve.fallback,
+        path: false,
+        fs: false,
+      },
+      mainFields: ['module', 'main', 'browser'],
+    };
+
     if (!isServer) {
       config.target = 'electron-renderer';
+      config.node = {
+        __dirname: true,
+      };
+      config.plugins = [
+        ...config.plugins,
+        new webpack.ProvidePlugin({
+          React: 'react',
+        }),
+        new webpack.DefinePlugin({
+          global: 'globalThis',
+        })
+      ];
     }
+    config.output.globalObject = 'this';
     return config;
   },
-
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-})
+});

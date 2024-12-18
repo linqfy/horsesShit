@@ -1,3 +1,4 @@
+'use client'
 // pages/detalleUsuario.tsx
 
 import {
@@ -12,6 +13,7 @@ import {
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import dynamic from 'next/dynamic';
 import Router, { useRouter } from 'next/router';
 import React, { useEffect, useState } from 'react';
 
@@ -98,6 +100,7 @@ const InstallmentsTable: React.FC<{ buyerInstallments: any[] }> = ({ buyerInstal
     };
 
     useEffect(() => {
+        if (typeof window === 'undefined') return;
         const fetchInstallmentsDetails = async () => {
             setLoading(true);
             try {
@@ -667,4 +670,4 @@ const DetalleUsuario: React.FC = () => {
     );
 };
 
-export default DetalleUsuario;
+export default dynamic(() => Promise.resolve(DetalleUsuario), { ssr: false });

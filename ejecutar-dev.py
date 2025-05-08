@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineDownloadRequest
+from PySide6.QtWidgets import QMessageBox
+
 VERSION = "UNDEFINED"
 
 def check_updates():
@@ -29,15 +31,30 @@ def check_updates():
     try:
         # Check for updates using a simple HTTP request
         response = subprocess.run(
-            ["curl", "-s", "https://raw.githubusercontent.com/yourusername/yourrepo/main/VERSION"],
+            ["curl", "-s", "https://raw.githubusercontent.com/linqfy/horsesShit/refs/heads/master/VERSION"],
             capture_output=True,
             text=True
         )
         latest_version = response.stdout.strip()
+
+        print(f"Latest version: {latest_version}")
+        print(f"Current version: {VERSION}")
         
         if latest_version != VERSION:
             print(f"Update available: {latest_version}")
-            # Optionally, you can implement the update logic here
+            # Ask user for confirmation to update
+            answer = QMessageBox.question(
+                None, 
+                "Actualización Disponible",
+                f"Hay una actualización disponible a la versión {latest_version}. ¿Desea actualizar?",
+                QMessageBox.Yes | QMessageBox.No
+            ) == QMessageBox.Yes
+            if answer:
+                # Start the update process
+                print("Starting update...")
+                subprocess.run(["python", "update.py"])
+                print("Update completed.")
+
         else:
             print("No updates available.")
     except Exception as e:

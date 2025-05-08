@@ -5,16 +5,61 @@ import sys
 import time
 import psutil
 from pathlib import Path
-from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
+
+from PySide6.QtCore import (
+    QTimer, QUrl, Qt
+)
+from PySide6.QtGui import (
+    QFont, QColor
+)
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QVBoxLayout, QWidget
+)
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineDownloadRequest
-from PySide6.QtWidgets import QInputDialog
-import tkinter as tk
-from tkinter import filedialog
+from PySide6.QtWidgets import QMessageBox
 
-VERSION = "1.4.5"
+VERSION = "UNDEFINED"
 
+def check_updates():
+    with open("VERSION", "r") as f:
+        global VERSION 
+        VERSION = f.read().strip()
+    print(f"Version: {VERSION}")
+
+    print("Checking for updates...")
+    try:
+        # Check for updates using a simple HTTP request
+        response = subprocess.run(
+            ["curl", "-s", "https://raw.githubusercontent.com/linqfy/horsesShit/refs/heads/master/VERSION"],
+            capture_output=True,
+            text=True
+        )
+        latest_version = response.stdout.strip()
+
+        print(f"Latest version: {latest_version}")
+        print(f"Current version: {VERSION}")
+        
+        if latest_version != VERSION:
+            print(f"Update available: {latest_version}")
+            # Ask user for confirmation to update
+            answer = QMessageBox.question(
+                None, 
+                "Actualización Disponible",
+                f"Hay una actualización disponible a la versión {latest_version}. ¿Desea actualizar?",
+                QMessageBox.Yes | QMessageBox.No
+            ) == QMessageBox.Yes
+            if answer:
+                # Start the update process
+                print("Starting update...")
+                subprocess.run(["python", "update.py"])
+                print("Update completed.")
+
+        else:
+            print("No updates available.")
+    except Exception as e:
+        print(f"Error checking for updates: {e}")
+    
 
 def start_hidden_process(command, cwd):
     """Start a subprocess with platform-specific optimizations."""
@@ -132,44 +177,24 @@ class AppWindow(QMainWindow):
 
 
     def handle_download(self, download: QWebEngineDownloadRequest):
-        """Handle file downloads from the web view using Qt's native file dialog"""
-        from PySide6.QtWidgets import QFileDialog
+        """Handle file downloads from the web view"""
+        # Use /exportado as the download directory
+        download_dir = Path.home() / "Downloads" / "exportados"
         
-        # Get suggested filename from the download request
-        suggested_name = download.suggestedFileName()
-        if not suggested_name.lower().endswith('.pdf'):
-            suggested_name += '.pdf'
+        # Get filename from download request
+        filename = download.downloadFileName() or "document.pdf"
+        save_path = download_dir / filename
         
-        # Use Qt's native file dialog
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save File",
-            str(self.download_dir / suggested_name),
-            "PDF Files (*.pdf)"
-        )
-        
-        if not file_path:
-            # User canceled the dialog
-            download.cancel()
-            return
-        
-        # Set up download parameters based on the selected file path
-        save_path = Path(file_path)
-        
-        # Handle existing files by appending a counter if needed
+        # Handle existing files by appending a counter
         counter = 1
         while save_path.exists():
             stem = save_path.stem
-            # Remove previous counter if it exists
-            if '_' in stem:
-                base_stem = stem.rsplit('_', 1)[0]
-                if base_stem and base_stem[-1].isdigit():
-                    stem = base_stem
             new_name = f"{stem}_{counter}{save_path.suffix}"
             save_path = save_path.with_name(new_name)
             counter += 1
         
-        download.setDownloadDirectory(str(save_path.parent))
+        # Set up download parameters
+        download.setDownloadDirectory(str(download_dir))
         download.setDownloadFileName(save_path.name)
         download.accept()
 
@@ -216,16 +241,33 @@ def main():
     # Ensure clean startup
     app = QApplication(sys.argv)
 
+    print("Starting application...")
+
+    print("Checking for updates...")
+    check_updates()
+    print(f"Application version: {VERSION}")
+
+    # Launch splash screen as separate process
+    print("Starting splash screen in separate process...")
+
     splash = start_hidden_process("python splash_screen.py", cwd="./")
-    time.sleep(2)  # Wait for splash screen to initialize
-    
-    # Start processes with delay to ensure proper initialization
+
+    print("Splash screen process started")
+
+    print("Starting backend process...")
     backend_process = start_hidden_process("python main.py", cwd="./prod")
+    print(f"Backend process started with PID: {backend_process.pid}")
     time.sleep(1)  # Wait for backend to initialize
-    
+
+    print("Starting frontend process...")
     frontend_process = start_hidden_process("next start", cwd="./front")
-    time.sleep(2)  # Wait for frontend to initialize
-    
+    print(f"Frontend process started with PID: {frontend_process.pid}")
+
+    # Allow time for services to initialize and splash screen to complete
+    print("Waiting for services and splash screen...")
+    time.sleep(4)
+
+    print("Launching main application window...")
     url = "http://localhost:3000"
     main_window = AppWindow(url, backend_process, frontend_process)
     main_window.show()
